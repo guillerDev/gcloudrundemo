@@ -1,0 +1,62 @@
+buildscript {
+    ext.kotlin_version = '1.5.31'
+    ext.ktor_version = '1.6.4'
+    ext.jib_version = '3.1.4'
+    ext.logback_version = '1.2.6'
+
+    repositories {
+        jcenter()
+        mavenCentral()
+    }
+    dependencies {
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+    }
+}
+plugins {
+    id "com.google.cloud.tools.jib" version "1.8.0"
+    id "org.jmailen.kotlinter" version "3.2.0"
+    id "org.jetbrains.kotlin.jvm" version "1.5.31"
+}
+apply plugin: 'application' // JVM plugin
+
+mainClassName = "io.ktor.server.jetty.DevelopmentEngine"
+
+sourceSets {
+    main.kotlin.srcDirs = ['src/main/kotlin']
+    main.resources.srcDirs = ['src/main/resources']
+    test.kotlin.srcDirs = ['src/test/kotlin']
+}
+
+group 'com.leakingcode'
+version '0.2'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation "io.ktor:ktor-server-core:$ktor_version"
+    implementation "io.ktor:ktor-server-jetty:$ktor_version"
+    implementation "ch.qos.logback:logback-classic:$logback_version"
+
+    testImplementation "org.jetbrains.kotlin:kotlin-test"
+    testImplementation "org.jetbrains.kotlin:kotlin-test-junit"
+    testImplementation "io.ktor:ktor-server-test-host:$ktor_version"
+}
+
+compileKotlin {
+    kotlinOptions.jvmTarget = "11"
+}
+compileTestKotlin {
+    kotlinOptions.jvmTarget = "11"
+}
+
+// base jib is targeting distroless jdk 11 gcr.io/distroless/java:11,
+// we need to make sure that JVM is compatible otherwise we could define a custom base image with jib.from.image
+targetCompatibility = 11
+
+jib {
+    container {
+        mainClass = mainClassName
+    }
+}

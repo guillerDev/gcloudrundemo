@@ -1,0 +1,41 @@
+# cloudbuild.yaml
+# Schema: https://cloud.google.com/cloud-build/docs/build-config
+# Dependencies:
+# - $_BUCKET_NAME
+#    - allow public access to bucket: gsutil iam ch allUsers:objectViewer gs://PUT_HERE_BUCKET_NAME
+# - $_SERVICE_NAME
+#    - gcloud run service name
+
+steps:
+  - name: 'openjdk:11'
+    id: Check
+    args: [ 'sh', 'check.sh' ]
+    env:
+      - 'REPO_NAME=$REPO_NAME'
+      - 'PROJECT_ID=$PROJECT_ID'
+      - 'COMMIT_SHA=$COMMIT_SHA'
+      - 'BRANCH_NAME=$BRANCH_NAME'
+      - 'BUCKET_NAME=$_BUCKET_NAME'
+
+  - name: 'gcr.io/cloud-builders/gsutil'
+    id: Store_unit_test_results
+    args: [ '-q', 'cp', '-r', '/workspace/build/reports/tests/test/',
+            'gs://$_BUCKET_NAME/$BRANCH_NAME/$COMMIT_SHA' ]
+    waitFor: [ 'Check' ]
+
+  - name: 'openjdk:11'
+    id: Jib
+    args: [ './gradlew', 'check', 'jib', '--image', 'gcr.io/$PROJECT_ID/$BRANCH_NAME:$SHORT_SHA' ]
+
+  - name: 'gcr.io/cloud-builders/gcloud'
+    id: Deploy
+    args: [ 'beta', 'run', 'deploy', '$_SERVICE_NAME',
+            '--platform=managed', '--region=europe-west1',
+            '--allow-unauthenticated', '--image=gcr.io/$PROJECT_ID/$BRANCH_NAME:$SHORT_SHA' ]
+
+artifacts:
+  objects:
+    location: 'gs://$_BUCKET_NAME/$BRANCH_NAME/$COMMIT_SHA'
+    paths: [ "'/workspace/output.txt'" ]
+
+
